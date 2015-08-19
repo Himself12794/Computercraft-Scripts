@@ -1,0 +1,30 @@
+--[[
+    Author
+        Rasmus Sommer aka. TheSommer
+    How to use:
+        Slot 1 - Seeds/Potatos/Carrots etc.
+        Slot 2 - Bonemeal
+        wheat
+--]]
+ 
+while true do
+    turtle.select(1)
+    turtle.place()
+    turtle.select(2)
+    turtle.place()
+    if turtle.getItemCount(2) == 0 then
+        turtle.turnRight()
+        if turtle.suck() == false then
+            print("No Bonemeal available!")
+            turtle.turnLeft()
+            return
+        end
+        turtle.turnLeft()
+    end
+    turtle.select(1)
+    turtle.dig()
+    turtle.select(3)
+    turtle.dropDown()
+    turtle.select(4)
+    turtle.dropDown()
+end

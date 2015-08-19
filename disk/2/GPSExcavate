@@ -1,0 +1,433 @@
+args = {...}
+rednet.open("right")
+-- Make sure turtle is positioned correctly
+term.clear()
+term.setCursorPos(1,1)
+print("I am set up to dig a rectangle downward in a forward-left direction. There should be a refuel chest to my right and a dropoff chest behind me. Is this how I am set up?")
+print("\(y/n\)")
+while true do
+        local event, character = os.pullEvent()
+        if event == "char" and character == "y" then
+                print("Initializing...")
+                sleep(1)
+                break
+        elseif event == "char" and character == "n" then
+                print("Please set up correctly.")
+                error()
+        end
+end
+
+local function forward() --Forward movement
+        --Move forward
+        local i = 0 --Iterator for bedrock/strong player detection
+        while not turtle.forward() do
+                if not turtle.dig() then --Detect blocks
+                        i = i + 1
+                        turtle.attack() --Detect entities
+                        if i == 30 then
+                                return false --If movement fails
+                        end
+                end
+        end
+        --Clear above and below
+        while turtle.detectUp() do
+                turtle.digUp()
+        end
+        while turtle.detectDown() do
+                turtle.digDown()
+        end
+        --Position tracking
+        if currentpos.f == 0 then
+                currentpos.z = currentpos.z + 1
+        elseif currentpos.f == 1 then
+                currentpos.x = currentpos.x - 1
+        elseif currentpos.f == 2 then
+                currentpos.z = currentpos.z - 1
+        elseif currentpos.f == 3 then
+                currentpos.x = currentpos.x + 1
+        else
+                running = false
+                error("Something went wrong with the direction :P/>/>/>")
+        end
+        return true
+end
+local function turnRight() --Right turn with position tracking
+        turtle.turnRight()
+        if currentpos.f < 3 then
+                currentpos.f = currentpos.f + 1
+        else
+                currentpos.f = 0
+        end
+end
+local function turnLeft() --Left turn with position tracking
+        turtle.turnLeft()
+        if currentpos.f > 0 then
+                currentpos.f = currentpos.f - 1
+        else
+                currentpos.f = 3
+        end
+end
+local function down() --Downward movement
+        --Move down
+        local i = 0 --Iterator for bedrock detection
+        while not turtle.down() do
+                if not turtle.digDown() then --Detect blocks
+                        i = i + 1
+                        turtle.attackDown() --Detect entities
+                        if i == 25 then
+                                return false --If movement fails
+                        end
+                end
+        end
+        --Position tracking
+        currentpos.y = currentpos.y - 1
+        return true
+end
+local function mineDown() --Moves one layer downward
+        if currentpos.y == edge.y + 2 then --If close to bottom (2 blocks away)
+                if not down() then --If downward movement fails, return to start
+                        shell.run("goto","special",0,0,0,0,currentpos.x,currentpos.y,currentpos.z,currentpos.f)
+                        running = false
+                        error("I think I tried to dig bedrock.")
+                end
+        elseif currentpos.y == edge.y + 3 then --If close to bottom (3 blocks away)
+                for i=1,2 do
+                        if not down() then --If downward movement fails, return to start
+                                shell.run("goto","special",0,0,0,0,currentpos.x,currentpos.y,currentpos.z,currentpos.f)
+                                running = false
+                                error("I think I tried to dig bedrock.")
+                        end
+                end
+        else --If far enough from bottom
+                for i=1,3 do
+                        if not down() then --If downward movement fails, return to start
+                                shell.run("goto","special",0,0,0,0,currentpos.x,currentpos.y,currentpos.z,currentpos.f)
+                                running = false
+                                error("I think I tried to dig bedrock.")
+                        end
+                end
+        end
+end
+local function getFuelLevel() --Check if fuel level is unlimited
+        local fuelLevel = turtle.getFuelLevel()
+        if type(fuelLevel) == "string" then
+                fuelLevel = 9001e9001
+        end
+        return fuelLevel
+end
+local function findDistance(x,y,z,newx,newy,newz) --Find how many blocks to travel to get somewhere (non-diagonally)
+        local distance = 0
+        local xDist = 0
+        local yDist = 0
+        local zDist = 0
+        if x > newx then
+                xDist = x - newx
+        elseif x < newx then
+                xDist = newx - x
+        end
+        if y > newy then
+                yDist = y - newy
+        elseif y < newy then
+                yDist = newy - y
+        end
+        if z > newz then
+                zDist = z - newz
+        elseif z < newz then
+                zDist = newz - z
+        end
+        distance = xDist + yDist + zDist
+        return distance
+end
+local function saveLoc()
+        --Write variables to savefile
+        local fPos = fs.open("GPSExcavateCurrentpos","w")
+        fPos.writeLine(currentpos.x)
+        fPos.writeLine(currentpos.y)
+        fPos.writeLine(currentpos.z)
+        fPos.writeLine(currentpos.f)
+        fPos.writeLine(edge.x)
+        fPos.writeLine(edge.y)
+        fPos.writeLine(edge.z)
+        fPos.writeLine(backwards)
+        fPos.writeLine(totalMined)
+        fPos.writeLine(lastSlot)
+        fPos.close()
+end
+local function detectUnwanted()
+        local unwantedSlots = 0
+        for i=1, lastSlot do
+                turtle.select(i)
+                if turtle.compareTo(13) or turtle.compareTo(14) or turtle.compareTo(15) or turtle.compareTo(16) then
+                        unwantedSlots = unwantedSlots + 1
+                end
+        end
+        turtle.select(1)
+        return unwantedSlots
+end
+local function dropUnwanted()
+        local freeSlots = 0
+        turtle.turnLeft()
+        turtle.turnLeft()
+        for i=1, lastSlot do
+                turtle.select(i)
+                if turtle.compareTo(13) or turtle.compareTo(14) or turtle.compareTo(15) or turtle.compareTo(16) then
+                        turtle.drop()
+                end
+        end
+        turtle.turnLeft()
+        turtle.turnLeft()
+        turtle.select(1)
+end
+local function dropAll() --Drop mined resources, display amounts
+        local mined = 0
+        turtle.turnRight()
+        turtle.turnRight()
+        for i=1,lastSlot do
+                turtle.select(i)
+                mined = mined + turtle.getItemCount(i)
+                turtle.drop()
+        end
+        --This will send to rednet soon
+        totalMined = totalMined + mined
+        print("Minerals mined this run: "..mined)
+        print("Total mined: "..totalMined)
+        turtle.select(1)
+        turtle.turnRight()
+        turtle.turnRight()
+end
+local function refuel() --Refuel if needed
+        turtle.turnRight()
+        turtle.select(1)
+        while getFuelLevel() < findDistance(currentpos.x,currentpos.y,currentpos.z,0,0,0) + 400 do --Enough to make it back to where he was digging and dig a bit
+                turtle.suck()
+                if turtle.getItemCount(1) == 0 then --If no fuel is in the box
+                        print("Please put fuel in my top-left slot, then press space.")
+                        while true do
+                                local event, character = os.pullEvent()
+                                if event == "key" and character == 57 then
+                                        print("Refueling...")
+                                        sleep(1)
+                                        break
+                                end
+                        end
+                end
+                if not turtle.refuel() then --If item isn't fuel
+                        print("This is not fuel! Please remove it, then press space.")
+                        while true do
+                                local event, character = os.pullEvent()
+                                if event == "key" and character == 57 then
+                                        print("Refueling...")
+                                        sleep(1)
+                                        break
+                                end
+                        end
+                end
+        end
+        turtle.turnLeft()
+end
+local function dropRefuel()
+        print("Dropping & refueling")
+        shell.run("goto","special",0,0,0,0,currentpos.x,currentpos.y,currentpos.z,currentpos.f) --Return to start
+        dropAll()
+        refuel()
+        shell.run("goto","special",currentpos.x,currentpos.y,currentpos.z,currentpos.f,0,0,0,0) --Return to where he left off
+end
+local function excavate() --The actual excavation process
+        while running do --Make sure stop signal hasn't been sent
+                turtle.select(1)
+                if currentpos.x == 0 and currentpos.y == 0 and currentpos.z == 0 then --To start off a layer down
+                        down()
+                        turtle.digDown()
+                end
+                if ( currentpos.x == edge.x and currentpos.y == edge.y + 1 and currentpos.z == edge.z or currentpos.x == edge.x and currentpos.y == edge.y + 1 and currentpos.z == 0 ) and not backwards or ( currentpos.x == 0 and currentpos.y == edge.y + 1 and currentpos.z == 0 or currentpos.x == 0 and currentpos.y == edge.y + 1 and currentpos.z == edge.z ) and backwards then --Very long check to see if at the end of process
+                        if lastSlot ~= 16 and detectUnwanted()  then
+                                dropUnwanted()
+                        end
+                        shell.run("goto","special",0,0,0,0,currentpos.x,currentpos.y,currentpos.z,currentpos.f) --Return to start
+                        dropAll()
+                        print("Done digging a hole! Whew, that was hard work.")
+                        done = true --Record that turtle is finished digging
+                        running = false --Stop other "stopping" loop
+                        break
+                end
+                if turtle.getItemCount(lastSlot) > 0 then --Check if inventory is full or fuel is low
+                        if lastSlot ~= 16 then
+                                dropUnwanted()
+                                if detectUnwanted() < 3 then
+                                        dropRefuel()
+                                elseif turtle.getItemCount(lastSlot) > 0 then
+                                        turtle.select(lastSlot)
+                                        while turtle.getItemCount(lastSlot) > 0 do
+                                                for i=1, lastSlot do
+                                                        turtle.transferTo(i)
+                                                end
+                                        end
+                                end
+                        else
+                                dropRefuel()
+                        end
+                end
+                if getFuelLevel() < (findDistance(currentpos.x,currentpos.y,currentpos.z,0,0,0) + 16) then
+                        if lastSlot ~= 16 then
+                                dropUnwanted()
+                        end
+                        dropRefuel()
+                end
+                if ( currentpos.x == edge.x and currentpos.z == edge.z or currentpos.x == edge.x and currentpos.z == 0 ) and not backwards then --If at the end of a layer
+                        mineDown()
+                        turnRight()
+                        turnRight()
+                        backwards = true --Switching directions
+                        turtle.digDown()
+                elseif ( currentpos.x == 0 and currentpos.z == 0 or currentpos.x == 0 and currentpos.z == edge.z ) and backwards then --If at the end of a layer
+                        mineDown()
+                        turnLeft()
+                        turnLeft()
+                        backwards = false --Switching directions
+                        turtle.digDown()
+                elseif currentpos.z == edge.z then --If at edge, turn around and do next line
+                        if backwards then
+                                turnRight()
+                                forward()
+                                turnRight()
+                        else
+                                turnLeft()
+                                forward()
+                                turnLeft()
+                        end
+                elseif currentpos.z == 0 and currentpos.x ~= 0 then --If at edge, turn around and do next line
+                        if backwards then
+                                turnLeft()
+                                forward()
+                                turnLeft()
+                        else
+                                turnRight()
+                                forward()
+                                turnRight()
+                        end
+                end
+                if not forward() then --If movement fails, return to start
+                        shell.run("goto","special",0,0,0,0,currentpos.x,currentpos.y,currentpos.z,currentpos.f)
+                        running = false
+                        error("I think I tried to dig bedrock.")
+                end
+                saveLoc()
+        end
+end
+local function stop() --Ability to stop turtle mid-excavation. This will wait until current action is done, then exit the excavate function
+        while running do
+                local event, data, message = os.pullEvent()
+                if event == "char" and data == "p" then --If direct keypress
+                        print("Stopping...")
+                        running = false
+                        break
+                elseif event == "rednet_message" and message == "stop" then --If rednet stop signal
+                        print("Stopping...")
+                        running = false
+                        id = tonumber(data)
+                        break
+                end
+        end
+end
+local function restart() --To restart from previous digging
+        print("Restarting from saved position...")
+        if not fs.exists("GPSExcavateCurrentpos") then -- Check for save file
+                error("Could not find saved position!")
+        end
+        --Read save file, change variables
+        local fPos = fs.open("GPSExcavateCurrentpos","r")
+        currentpos.x = tonumber(fPos.readLine())
+        currentpos.y = tonumber(fPos.readLine())
+        currentpos.z = tonumber(fPos.readLine())
+        currentpos.f = tonumber(fPos.readLine())
+        edge.x = tonumber(fPos.readLine())
+        edge.y = tonumber(fPos.readLine())
+        edge.z = tonumber(fPos.readLine())
+        local backwardsString = fPos.readLine()
+        if backwardsString == "true" then
+                backwards = true
+        else
+                backwards = false
+        end
+        totalMined = tonumber(fPos.readLine())
+        lastSlot = tonumber(fPos.readLine())
+        fPos.close()
+        shell.run("goto","special",currentpos.x,currentpos.y,currentpos.z,currentpos.f,0,0,0,0) --Go to position where turtle left off
+        restarting = true
+        print("Let the diggy-hole recommence!")
+end
+
+totalMined = 0 --Total mined out blocks over course of excavation
+restarting = false --Whether turtle is restarting from save
+done = false --Whether turtle has completed excavation
+running = true --Whether turtle is currently digging
+backwards = false --Which direction turtle is digging the layers currently
+currentpos = {} --Current position storage. It's a table just because it is easier, no real need for it
+edge = {} --Boundaries of hole. Same deal as currentpos, no real reason to have it as a table
+id = -1 --Id of computer that sent the rednet message. This is so that it can reply when it has stopped
+w, l, d = 0, 0, 0 --Width, length, depth of hole. This is just for input of numbers
+currentpos.x, currentpos.y, currentpos.z, currentpos.f = 0, 0, 0, 0 --Initialise pieces of currentpos
+lastSlot = 16 --Slot in which to make sure there are no blocks: this is to keep any comparing slots free
+
+if #args == 1 and args[1] == "restart" then --If restarting from save
+        restart()
+elseif #args == 2 and tonumber(args[1]) > 1 and tonumber(args[2]) > 2 then --If a square hole is wanted
+        w = tonumber(args[1])
+        l = w
+        d = tonumber(args[2])
+elseif #args == 3 and tonumber(args[1]) > 1 and tonumber(args[2]) > 1 and tonumber(args[3]) > 2 then --If a non-square hole is wanted
+        w = tonumber(args[1])
+        l = tonumber(args[2])
+        d = tonumber(args[3])
+else --If arguments improperly input, print usage
+        print("Usage: \"GPSExcavate <side> <depth>\" or \"GPSExcavate <width> <length> <depth>\"")
+        print("Note: depth must be at least 3.")
+        print("To restart digging, use: \"GPSExcavate restart\"")
+        error()
+end
+if not restarting then --Input edge locations
+        edge.x = w - 1
+        edge.y = -(d - 1)
+        edge.z = l - 1
+        print("Would you like the turtle not to collect certain blocks?")
+        print("\(y/n\)")
+        while true do
+                local event, character = os.pullEvent()
+                if event == "char" and character == "y" then
+                        lastSlot = 12
+                        print("Please put unwanted blocks in the bottom four slots, then press space to continue.")
+                        while true do
+                                local event, character = os.pullEvent()
+                                if event == "key" and character == 57 then
+                                        print("Turtle will not collect these blocks.")
+                                        break
+                                end
+                        end
+                        break
+                elseif event == "char" and character == "n" then
+                        lastSlot = 16
+                        break
+                end
+        end
+        print("Let the diggy-hole commence! Digging a hole "..w.." by "..l.." by "..d.." meters.")
+end
+print("Press \"p\" to save and stop at any time.")
+parallel.waitForAll(excavate,stop) --Actual running of program. This is to enable stopping mid-digging
+if not done then --If turtle was stopped before the end
+        print("Saving position and dimensions...")
+        sleep(1)
+        saveLoc()
+        print("Position and dimensions saved. Returning to base...")
+        shell.run("goto","special",0,0,0,0,currentpos.x,currentpos.y,currentpos.z,currentpos.f) --Return to start
+        dropAll()
+        print("Excavation stopped.")
+        if id ~= -1 then --If stop signal was sent by rednet, reply when done returning
+                rednet.send(id,"stopped")
+        end
+else --Get rid of save file if turtle is done excavating. I will find a way to have rednet in here too
+        fs.delete("GPSExcavateCurrentpos")
+end
+print("Next hole please? :D/>/>/>")
+--Delete variables so they don't persist
+args, currentpos, edge, id, done, restarting, running, w, l, d, backwards, lastSlot = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil
+rednet.close("right")

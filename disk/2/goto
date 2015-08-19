@@ -1,0 +1,361 @@
+args = {...}
+
+if not fs.isDir("locations") then
+        fs.makeDir("locations")
+end
+
+local function getDirection()
+        local f = 0
+        local x, y, z = gps.locate(5,false)
+        y = nil
+        if args[1] == "special" then
+                if turtle.detect() then
+                        if not turtle.dig() then
+                                error("Tried to dig bedrock.")
+                        end
+                end
+                while not turtle.forward() do
+                        turtle.attack()
+                end
+        else
+                if not turtle.forward() then
+                        error("I am against a wall.")
+                end
+        end
+        local newx, newy, newz = gps.locate(5,false)
+        newy = nil
+        turtle.back()
+        if newz > z then
+                f = 0
+        elseif newx < x then
+                f = 1
+        elseif newz < z then
+                f = 2
+        elseif newx > x then
+                f = 3
+        end
+        return f
+end
+local function gotox(x,newx,f)
+        if f == 0 then
+                turtle.turnRight()
+        elseif f == 2 then
+                turtle.turnLeft()
+        elseif f == 3 then
+                turtle.turnRight()
+                turtle.turnRight()
+        end
+        if newx < x then
+                local j = x - newx
+                for i=1,j do
+                        if args[1] == "special" then
+                                local i = 0
+                                while not turtle.forward() do
+                                        if not turtle.dig() then
+                                                i = i + 1
+                                                turtle.attack()
+                                                if i == 30 then
+                                                        error("Path blocked.")
+                                                end
+                                        end
+                                end
+                        else
+                                if not turtle.forward() then
+                                        error("Path blocked.")
+                                end
+                        end
+                end
+        elseif newx > x then
+                local j = newx - x
+                turtle.turnRight()
+                turtle.turnRight()
+                for i=1,j do
+                        if args[1] == "special" then
+                                local i = 0
+                                while not turtle.forward() do
+                                        if not turtle.dig() then
+                                                i = i + 1
+                                                turtle.attack()
+                                                if i == 30 then
+                                                        error("Path blocked.")
+                                                end
+                                        end
+                                end
+                        else
+                                if not turtle.forward() then
+                                        error("Path blocked.")
+                                end
+                        end
+                end
+                turtle.turnLeft()
+                turtle.turnLeft()
+        end
+                if f == 0 then
+                turtle.turnLeft()
+        elseif f == 2 then
+                turtle.turnRight()
+        elseif f == 3 then
+                turtle.turnLeft()
+                turtle.turnLeft()
+        end
+end
+local function gotoy(y,newy)
+        if newy > y then
+                local j = newy - y
+                for i=1,j do
+                        if args[1] == "special" then
+                                local i = 0
+                                while not turtle.up() do
+                                        if not turtle.digUp() then
+                                                i = i + 1
+                                                turtle.attackUp()
+                                                if i == 30 then
+                                                        error("Path blocked.")
+                                                end
+                                        end
+                                end
+                        else
+                                if not turtle.up() then
+                                        error("Path blocked.")
+                                end
+                        end
+                end
+        elseif newy < y then
+                local j = y - newy
+                for i=1,j do
+                        if args[1] == "special" then
+                                local i = 0
+                                while not turtle.down() do
+                                        if not turtle.digDown() then
+                                                i = i + 1
+                                                turtle.attackDown()
+                                                if i == 30 then
+                                                        error("Path blocked.")
+                                                end
+                                        end
+                                end
+                        else
+                                if not turtle.down() then
+                                        error("Path blocked.")
+                                end
+                        end
+                end
+        end
+end
+local function gotoz(z,newz,f)
+        if f == 1 then
+                turtle.turnLeft()
+        elseif f == 2 then
+                turtle.turnLeft()
+                turtle.turnLeft()
+        elseif f == 3 then
+                turtle.turnRight()
+        end
+        if newz > z then
+                local j = newz - z
+                for i=1,j do
+                        if args[1] == "special" then
+                                local i = 0
+                                while not turtle.forward() do
+                                        if not turtle.dig() then
+                                                i = i + 1
+                                                turtle.attack()
+                                                if i == 30 then
+                                                        error("Path blocked.")
+                                                end
+                                        end
+                                end
+                        else
+                                if not turtle.forward() then
+                                        error("Path blocked.")
+                                end
+                        end
+                end
+        elseif newz < z then
+                turtle.turnRight()
+                turtle.turnRight()
+                local j = z - newz
+                for i=1,j do
+                        if args[1] == "special" then
+                                local i = 0
+                                while not turtle.forward() do
+                                        if not turtle.dig() then
+                                                i = i + 1
+                                                turtle.attack()
+                                                if i == 30 then
+                                                        error("Path blocked.")
+                                                end
+                                        end
+                                end
+                        else
+                                if not turtle.forward() then
+                                        error("Path blocked.")
+                                end
+                        end
+                end
+                turtle.turnLeft()
+                turtle.turnLeft()
+        end
+        if f == 1 then
+                turtle.turnRight()
+        elseif f == 2 then
+                turtle.turnRight()
+                turtle.turnRight()
+        elseif f == 3 then
+                turtle.turnLeft()
+        end
+end
+local function findDistance(x,y,z,newx,newy,newz)
+        local distance = 0
+        local xDist = 0
+        local yDist = 0
+        local zDist = 0
+        if x > newx then
+                xDist = x - newx
+        elseif x < newx then
+                xDist = newx - x
+        end
+        if y > newy then
+                yDist = y - newy
+        elseif x < newx then
+                yDist = newy - y
+        end
+        if z > newz then
+                zDist = z - newz
+        elseif z < newz then
+                zDist = newz - z
+        end
+        distance = xDist + yDist + zDist
+        return distance
+end
+
+if args[1] ~= "special" then
+        rednet.open("right")
+end
+
+x, y, z, f, newx, newy, newz, newf = 0, 0, 0, 0, 0, 0, 0, 0
+
+if #args == 1 then
+        local location = args[1]
+        if fs.exists("locations/"..location) then
+                local fLocation = fs.open("locations/"..location,"r")
+                newx = tonumber(fLocation.readLine())
+                newy = tonumber(fLocation.readLine())
+                newz = tonumber(fLocation.readLine())
+                fLocation.close()
+                print("Going to "..location.."...")
+        else
+                error("Unknown location.")
+        end
+elseif #args == 2 and tonumber(args[1]) and tonumber(args[2]) then
+        newx, newz = tonumber(args[1]), tonumber(args[2])
+        print("Going to x: "..newx..", z: "..newz.."...")
+elseif #args == 3 and tonumber(args[1]) and tonumber(args[2]) and tonumber(args[3])then
+        newx, newy, newz = tonumber(args[1]), tonumber(args[2]), tonumber(args[3])
+        print("Going to x: "..newx..", y: "..newy..", z: "..newz.."...")
+elseif #args == 4 and tonumber(args[1]) and tonumber(args[2]) and tonumber(args[3]) and tonumber(args[4]) then
+        newx, newy, newz, newf = tonumber(args[1]), tonumber(args[2]), tonumber(args[3]), tonumber(args[4])
+        print("Going to x: "..newx..", y: "..newy..", z: "..newz..", f: "..newf.."...")
+elseif #args == 9 and args[1] == "special" and tonumber(args[2]) and tonumber(args[3]) and tonumber(args[4]) and tonumber(args[5]) and tonumber(args[6]) and tonumber(args[6]) and tonumber(args[7]) and tonumber(args[8]) and tonumber(args[9]) then
+        newx, newy, newz, newf = tonumber(args[2]), tonumber(args[3]), tonumber(args[4]), tonumber(args[5])
+        x, y, z, f = tonumber(args[6]), tonumber(args[7]), tonumber(args[8]), tonumber(args[9])
+elseif #args == 5 and args[1] == "add" and tonumber(args[3]) and tonumber(args[4]) and tonumber(args[5]) then
+        local location, xname, yname, zname = args[2], args[3], args[4], args[5]
+        if not fs.exists("locations/"..location) then
+                local fLocation = fs.open("locations/"..location,"w")
+                fLocation.writeLine(xname)
+                fLocation.writeLine(yname)
+                fLocation.writeLine(zname)
+                fLocation.close()
+                print("Location \""..location.."\" added.")
+        else
+                print("This location already exists. Would you like to replace it?\n\(y/n\)")
+                while true do
+                        event, character = os.pullEvent()
+                        if event == "char" and character == "y" then
+                                local fLocation = fs.open("locations/"..location,"w")
+                                fLocation.writeLine(xname)
+                                fLocation.writeLine(yname)
+                                fLocation.writeLine(zname)
+                                fLocation.close()
+                                print("Location changed.")
+                                break
+                        elseif event == "char" and character == "n" then
+                                print("Location not changed.")
+                                break
+                        end
+                end
+        end
+        error()
+else
+        print("To goto coords, use: \"goto <x> <z>\" or \"goto <x> <y> <z>\"")
+        print("To goto a set location, use: \"goto <name>\"")
+        print("To set a new location, use: \"goto add <name> <x> <y> <z>\"")
+        error()
+end
+
+if args[1] ~= "special" then
+        x, y, z = gps.locate(5,false)
+end
+if not x or not y or not z then
+        error("Out of GPS range")
+end
+local distance = findDistance(x,y,z,newx,newy,newz)
+local fuelLevel = turtle.getFuelLevel()
+if type(fuelLevel) == "string" then
+        fuelLevel = 9001e9001
+end
+if distance > fuelLevel then
+        error("Not enough fuel to travel so far!")
+end
+
+
+if args[1] ~= "special" then
+        turtle.up()
+        turtle.up()
+        turtle.up()
+        f = getDirection()
+end
+
+if newy > y then
+        gotoy(y,newy)
+end
+if newx ~= x then
+        gotox(x,newx,f)
+end
+if newz ~= z then
+        gotoz(z,newz,f)
+end
+if newy < y then
+        gotoy(y,newy)
+end
+if newf ~= f then
+        if f == 1 then
+                turtle.turnLeft()
+        elseif f == 2 then
+                turtle.turnLeft()
+                turtle.turnLeft()
+        elseif f == 3 then
+                turtle.turnRight()
+        end
+        if newf == 1 then
+                turtle.turnRight()
+        elseif newf == 2 then
+                turtle.turnLeft()
+                turtle.turnLeft()
+        elseif newf == 3 then
+                turtle.turnLeft()
+        end
+end
+
+if args[1] ~= "special" then
+        turtle.down()
+        turtle.down()
+        turtle.down()
+        print("Done traveling!")
+end
+
+if args[1] ~= "special" then
+        rednet.close("right")
+end
+args, x, y, z, f, newx, newy, newz, newf = nil, nil, nil, nil, nil, nil, nil, nil, nil

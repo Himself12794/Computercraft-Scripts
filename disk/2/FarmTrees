@@ -1,0 +1,373 @@
+local function keypress(key)
+    while true do
+        local event, press=os.pullEvent("char")
+        if press ~= "esc" then
+            if key == "any" then
+                return press
+            elseif press == key then
+                return true
+            end
+        end
+    end
+end
+local function yesno()
+    while true do
+        local key = keypress("any")
+        if key == "y" then
+            return true
+        elseif key == "n" then
+            return false
+        end
+    end
+end
+local function forward()
+    local i = 0
+    while not turtle.forward() do
+        if not turtle.dig() then
+            i = i + 1
+            turtle.attack()
+            if i == 30 then
+                error("Help! I'm stuck.")
+            end
+        end
+    end
+end
+local function drop()
+    local wood=0
+        turtle.turnRight()
+        turtle.turnRight()
+    for f=3,16 do
+        turtle.select(f)
+        wood = wood + turtle.getItemCount(f)
+        turtle.drop()
+    end
+    totalWood = totalWood + wood
+    print("Wood gathered this round: "..wood)
+    turtle.turnLeft()
+    if turtle.getItemCount(1)>0 or turtle.getItemCount(2)>0 then
+        turtle.select(1)
+        turtle.drop()
+        turtle.select(2)
+        turtle.drop()
+    end
+    turtle.select(1)
+    turtle.suck()
+    turtle.select(2)
+    turtle.suck()
+    turtle.turnLeft()
+end
+local function farm()
+    while farmloop do
+        local neededSaplings = (W*L)/4
+        local waitTime = 1200/(W*L)
+        turtle.up()
+        for a=1,W do
+            for b=1,L do
+                if tonumber(turtle.getFuelLevel()) and turtle.getFuelLevel()<128 then
+                    print("Fuel low. Refueling using collected wood...")
+                    turtle.select(3)
+                    turtle.refuel()
+                    turtle.select(1)
+                end
+                forward()
+                turtle.turnLeft()
+                if turtle.detect() then
+                    trees = trees + 1
+                    turtle.select(3)
+                    turtle.dig()
+                    forward()
+                    turtle.digDown()
+                    while turtle.compareUp() do
+                        turtle.digUp()
+                        turtle.up()
+                    end
+                    while not turtle.detectDown() do
+                        turtle.down()
+                    end
+                    turtle.back()
+                    if turtle.getItemCount(1)>1 then
+                        turtle.select(1)
+                    else
+                        turtle.select(2)
+                    end
+                    turtle.place()
+                    turtle.up()
+                end
+                if b<L then
+                    turtle.turnRight()
+                    forward()
+                    forward()
+                end
+            end
+            turtle.turnLeft()
+            for c=1,(x-1) do
+                forward()
+            end
+            if a<W then
+                turtle.turnRight()
+                forward()
+                forward()
+                forward()
+                turtle.turnRight()
+            end
+        end
+        turtle.turnLeft()
+        for d=1,(y-2) do
+            forward()
+        end
+        turtle.turnLeft()
+        turtle.down()
+       
+        --When saplings run low
+       
+        if turtle.getItemCount(1)+turtle.getItemCount(2)<neededSaplings then            
+            drop()
+        end
+       
+        sleep(waitTime)
+    end
+end
+local function stop()
+    while farmloop do
+        local event, data, message = os.pullEvent()
+        if event == "char" and data == "p" then
+            print("Stopping...")
+            farmloop = false
+            break
+        elseif event == "rednet_message" and message == "stop" then
+            print("Stopping...")
+            farmloop = false
+            id = tonumber(data)
+            break
+        end
+    end
+end
+ 
+setup=false
+setuploop=true
+farmloop=true
+autoMeasure=" "
+trees=0
+totalWood=0
+L=0
+W=0
+x=0
+y=0
+ 
+if fs.isDir("treesettings") and fs.exists("treesettings/autoMeasure") and fs.exists("treesettings/L") and fs.exists("treesettings/W") then
+    autoMeasurefile = fs.open("treesettings/autoMeasure","r")
+    autoMeasure = autoMeasurefile.readAll()
+    autoMeasurefile.close()
+    Lfile=fs.open("treesettings/L","r")
+    L=tonumber(Lfile.readAll())
+    Lfile.close()
+    Wfile=fs.open("treesettings/W","r")
+    W=tonumber(Wfile.readAll())
+    Wfile.close()
+else
+    setup = true
+    fs.makeDir("treesettings")
+end
+ 
+term.clear()
+term.setCursorPos(1,1)
+textutils.slowPrint("Initialization in progress...")
+sleep(2)
+print("This Turtle is programmed for a rectangular birch or spruce tree farm, with 2 spaces between each tree, and at least one block of space around the whole farm.")
+sleep(1)
+print("I am supposed to be placed in the bottom-left corner of the farm, with a dropoff chest behind me and a sapling chest to my right. If this is not the case, please move me there and try again.")
+print("Press any key to continue.")
+keypress("any")
+term.clear()
+term.setCursorPos(1,1)
+ 
+ 
+while true do
+    print("Type 'last' to use last settings, or 'setup' to reconfigure.")
+    local doSetup=io.read()
+ 
+    if setup or doSetup=="setup" or doSetup=="Setup" then
+        setup=true
+        if setup then
+            print("Past settings not detected.")
+        end
+        print("Prepare to enter your information.")
+        break
+    elseif doSetup=="last" or doSetup=="Last" then
+        setup=false
+        print("Using last settings.")
+        break
+    else
+        term.clear()
+        term.setCursorPos(1,1)
+    end
+end
+ 
+if setup then
+    while true do
+        print("Type 'auto' for auto-measurement, or 'manual' for manual input of farm dimensions.")
+        local AorM=io.read()
+        if AorM=="Auto" or AorM=="auto" then
+            autoMeasure="true"
+            print("Measuring set to automatic.")
+            break
+        elseif AorM=="Manual" or AorM=="manual" then
+            autoMeasure="false"
+            print("Please enter length of farm \(direction I am facing\).")
+            L=tonumber(io.read())
+            print("Please enter width of farm.")
+            W=tonumber(io.read())
+            print("Dimensions set.")
+            break
+        else
+            term.clear()
+            term.setCursorPos(1,1)
+        end
+    end
+    print("Would you like to save your settings? (y/n)")
+    local save=yesno()
+    if save then
+        print("Saving...")
+        sleep(2)
+        setAutoMeasurefile=fs.open("treesettings/autoMeasure","w")
+        setAutoMeasurefile.write(autoMeasure)
+        setAutoMeasurefile.close()
+        if autoMeasure=="false" then
+            setLfile=fs.open("treesettings/L","w")
+            setLfile.write(tostring(L))
+            setLfile.close()
+            setWfile=fs.open("treesettings/W","w")
+            setWfile.write(tostring(W))
+            setWfile.close()
+        end
+        print("Save Complete!")
+    else
+        print("Settings will be temporary.")
+    end
+end
+ 
+term.clear()
+term.setCursorPos(1,1)
+print("Please fill slots 1 and 2 with saplings.")
+print("When finished, press any key to continue.")
+keypress("any")
+term.clear()
+term.setCursorPos(1,1)
+if turtle.getFuelLevel()<256 then
+    print("Please refuel me first.")
+    error()
+end
+ 
+ 
+if autoMeasure=="true" then
+    print("Auto-Measuring...")
+   
+    --Auto-init:
+   
+    L=0
+    W=0
+   
+    --Measure length
+    forward()
+    local starting = true
+    while not turtle.detect() do
+        turtle.turnLeft()
+        if turtle.detect() then
+            L=L+1
+        elseif not starting then
+            turtle.turnLeft()
+            forward()
+            forward()
+            turtle.turnRight()
+            turtle.turnRight()
+            break
+        else
+            print("No saplings detected. Very confused.")
+            error()
+        end
+        turtle.turnRight()
+        forward()
+        if not turtle.detect() then
+            forward()
+            forward()
+        end
+        starting = false
+    end
+    turtle.turnLeft()
+    turtle.turnLeft()
+   
+    --Return to start
+   
+    x=3*L-1
+   
+    for e=1,x do
+        forward()
+    end
+    turtle.turnRight()
+   
+    --Measure width
+   
+    forward()
+    while not turtle.detect() do
+        turtle.turnRight()
+        if turtle.detect() then
+            W=W+1
+        else
+            turtle.turnRight()
+            forward()
+            forward()
+            turtle.turnLeft()
+            turtle.turnLeft()
+            break
+        end
+        turtle.turnLeft()
+        forward()
+        if not turtle.detect() then
+            forward()
+            forward()
+        end
+    end
+    turtle.turnRight()
+    turtle.turnRight()
+   
+    --Return to start
+   
+    y=3*W-1
+   
+    for f=1,y do
+        forward()
+    end
+    turtle.turnLeft()
+   
+    print("Saving...")
+    sleep(2)
+    autoMeasurefile=fs.open("treesettings/autoMeasure","w")
+    autoMeasurefile.write("false")
+    autoMeasurefile.close()
+    Lfile=fs.open("treesettings/L","w")
+    Lfile.write(tostring(L))
+    Lfile.close()
+    Wfile=fs.open("treesettings/W","w")
+    Wfile.write(tostring(W))
+    Wfile.close()
+    print("Save Complete!")
+else
+    x=3*L-1
+    y=3*W-1
+end
+ 
+print("Initialization complete! Beginning farming...")
+print("Press \"p\" at any time to stop. The turtle will complete one more circuit before stopping.")
+ 
+--Actual Farming
+ 
+parallel.waitForAll(farm,stop)
+ 
+--When finished
+ 
+drop()
+print("Farming Complete! This tree farming program courtesy of ClAnta :D")
+print("Total trees chopped down: "..trees)
+print("Total wood gathered: "..totalWood)
+ 
+setup, autoMeasure, L, W, x, y, trees, totalWood = nil, nil, nil, nil, nil, nil, nil, nil

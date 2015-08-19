@@ -1,0 +1,16 @@
+309 Bore Batteries
+308 GPS
+311 Bore Core
+310 Paul Bunyan
+313 Digging
+312 Bore Toggle Access
+315 Paul Bunyan
+314 Deployers
+317 Sending
+316 Paul Bunyan
+319 Receving
+318 down Files
+324 File Server
+322 Console testing
+320 EU Monitor
+321 EU Display

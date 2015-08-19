@@ -1,0 +1,67 @@
+local altitude = 0
+local fuelLevel = turtle.getFuelLevel()
+if not (type(fuelLevel) == "string" or fuelLevel > 400) then
+    error("May not have enough fuel. Please add some.")
+end
+for i=1,3 do
+    if turtle.detect() then
+        break
+    else
+        turtle.turnLeft()
+    end
+end
+if not turtle.detect() then
+    error("Could not find tree")
+end
+turtle.turnLeft()
+turtle.forward()
+turtle.turnRight()
+if not turtle.detect() then
+    turtle.turnRight()
+    turtle.forward()
+    turtle.turnLeft()
+end
+turtle.dig()
+turtle.forward()
+if turtle.detect() then
+    turtle.dig()
+    while turtle.detectUp() do
+        altitude = altitude + 1
+        turtle.digUp()
+        turtle.up()
+        turtle.dig()
+    end
+    turtle.turnRight()
+    turtle.dig()
+    turtle.forward()
+    turtle.turnLeft()
+    turtle.dig()
+    for i=1,altitude do
+        turtle.digDown()
+        turtle.down()
+        turtle.dig()
+    end
+    turtle.turnLeft()
+    turtle.forward()
+    turtle.turnRight()
+else
+    while turtle.detectUp() do
+        altitude = altitude + 1
+        turtle.digUp()
+        turtle.up()
+    end
+    for i=1,altitude do
+        turtle.digDown()
+        turtle.down()
+    end
+end
+turtle.turnLeft()
+turtle.turnLeft()
+turtle.forward()
+for i=1,16 do
+    turtle.select(i)
+    turtle.drop()
+end
+turtle.select(1)
+ 
+print("Done chopping!")
