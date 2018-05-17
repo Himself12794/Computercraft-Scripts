@@ -1,0 +1,211 @@
+args={...}
+
+ypos=0  -- Used for positioning
+delay=10 -- Number of layers after which to attempt emptying inventory
+		-- Broken right now - suggested to leave on even number
+chest=0 -- Offset for chest location
+id=9 -- Info output computer
+
+z=args[1] -- North/South
+x=args[2] -- East/West
+y=args[3] -- Up/Down
+
+zReverse=false -- change to determine the direction the turtle will dig
+xreverse=false -- default is top to right
+
+function clearLine()
+	local x, y=term.getCursorPos()
+	term.clearLine()
+	term.setCursorPos(1, y)
+end
+
+function clearA()
+	term.clear()
+	term.setCursorPos(1, 1)
+end
+
+function fuel()
+	if turtle.getFuelLevel()<49 then
+		turtle.select(1)
+		turtle.refuel()
+	end
+end
+function empty()
+	for i=2, 16 do
+		turtle.select(i)
+		if turtle.getItemCount(i)>0 then
+			while true do
+				if not turtle.drop() then
+					print("Inventory is full. Waiting for it to empty...")
+				else
+					break
+				end
+				sleep(5)
+			end
+		end
+	end
+end
+
+function returnA()
+	if zReverse then
+		for i=1, z-1 do
+			turtle.forward()
+		end
+		turtle.turnRight()
+		for i=1, x-1 do
+			turtle.forward()
+		end
+		for i=1, ypos+1+chest do
+			turtle.up()
+		end
+		empty()
+		turtle.turnRight()
+		for i=1, z-1 do
+			turtle.forward()
+		end
+		turtle.turnRight()
+		for i=1, x-1 do
+			turtle.forward()
+		end
+		turtle.turnRight()
+		for i=1, ypos+1+chest do
+			turtle.down()
+		end
+	else
+		turtle.turnLeft()
+		for i=1, ypos+1+chest do
+			turtle.up()
+		end
+		empty()
+		for i=1, ypos+1+chest do
+			turtle.down()
+		end
+		turtle.turnRight()
+	end	
+	return
+end
+function xMovE()
+	for cX=1, x-1 do
+		zMovE()
+		if zReverse and not xReverse then
+			turtle.turnRight()
+			turtle.dig()
+			turtle.forward()
+			turtle.turnRight()
+		elseif zReverse and xReverse then
+			turtle.turnLeft()
+			turtle.dig()
+			turtle.forward()
+			turtle.turnLeft()
+		elseif not zReverse and xReverse then
+			turtle.turnRight()
+			turtle.dig()
+			turtle.forward()
+			turtle.turnRight()
+		else
+			turtle.turnLeft()
+			turtle.dig()
+			turtle.forward()
+			turtle.turnLeft()
+		end
+	end
+	xReverse=not xReverse
+end
+
+function zMovE()
+    for cZ=1, z-1 do
+		turtle.dig()
+		turtle.forward()
+	end
+	zReverse=not zReverse
+end
+
+function start()
+	if y%2==0 then
+		for i=1, y+chest do
+			turtle.up()
+		end
+		turtle.turnLeft()
+		empty()
+		turtle.turnRight()
+	elseif y%2~=0 and x%2==0 then
+		turtle.turnLeft()
+		for i=1, y+chest do
+			turtle.up()
+		end
+		for i=1, z-1 do
+			turtle.forward()
+		end
+		empty()
+		turtle.turnRight()
+	else 
+		for i=1, x-1 do
+			turtle.forward()
+		end
+		turtle.turnRight()
+		for i=1, z-1 do
+			turtle.forward()
+		end
+		for i=1, y+chest do
+			turtle.up()
+		end
+		empty()
+		turtle.turnRight()
+	end
+end
+
+function layer()
+	turtle.digDown()
+	turtle.down()
+	xMovE()
+	zMovE()
+	zReverse=not zReverse
+	xReverse=not xReverse
+	turtle.turnLeft()
+	turtle.turnLeft()
+end
+
+function update(ypos)
+	rednet.open("right")
+	local data=ypos
+	rednet.send(id, data)
+end
+	
+function excavate()
+	de=1
+	for i=1, y do
+		update(ypos)
+		layer()
+		if de==delay then
+			returnA()
+			de=1
+		else de=de+1
+		end
+		ypos=ypos+1
+	end
+end
+
+function dos()
+	sel=1
+	local x, y=term.getCursorPos()
+	while true do
+		term.setCursorPos(x,y)
+		term.clearLine()
+		if sel==1 then 
+			print("--> Yes      No")
+		else print("    Yes  --> No")
+		end
+		a, b=os.pullEvent("key")
+		if b==203 then sel=1 end
+		if b==205 then sel=2 end
+		if b==28 then break end
+	end
+	if sel==1 then return true else return false end
+end
+
+excavate()
+start()
+
+rednet.open("right")
+rednet.send(id, "stop")
+rednet.close()
